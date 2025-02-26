@@ -1,0 +1,28 @@
+# Ignore build folders
+/build/
+/bin/
+/obj/
+
+# Ignore Visual Studio files
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Ignore compiled libraries and executables
+*.lib
+*.dll
+*.exe
+*.o
+*.a
+*.pdb
+*.idb
+*.obj
+*.exp
+
+# Ignore temporary and backup files
+*~
+*.bak
+*.swp
