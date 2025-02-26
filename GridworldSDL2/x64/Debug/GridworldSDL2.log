@@ -1,0 +1,3 @@
+﻿  main.cpp
+C:\Users\Jason\Desktop\GridworldSDL2\main.cpp(74,55): warning C4553: '==': result of expression not used; did you intend '='?
+  GridworldSDL2.vcxproj -> C:\Users\Jason\Desktop\GridworldSDL\x64\Debug\GridworldSDL2.exe
