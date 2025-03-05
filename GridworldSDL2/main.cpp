@@ -1,9 +1,7 @@
-#define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <SDL_mixer.h>
 #include <SDL_ttf.h>
 #include <iostream>
-#include <chrono>
 #include <atomic>
 #include <mutex>
 // Cheat
@@ -106,6 +104,7 @@ bool LoadSoundEffect(Mix_Chunk*& moveSound, Mix_Chunk*& wallSound) {
         std::cerr << "Failed to load sound effects! Mix_Error: " << Mix_GetError() << std::endl;
         return false;
     }
+    return true;
 }
 
 void PlayMoveSoundEffect(Mix_Chunk*& move) {
@@ -350,7 +349,7 @@ void GameLoop(std::atomic<bool>& isRunning, bool& endgame, bool& win) {
     }
 }
 
-int main() {
+int SDL_main(int argc, char* argv[]) {
     if (!Init()) {
         std::cerr << "Failed to initialize SDL2!" << std::endl;
         return -1;
