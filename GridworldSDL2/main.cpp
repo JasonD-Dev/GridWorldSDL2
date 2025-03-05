@@ -1,36 +1,27 @@
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <SDL_mixer.h>
+#include <SDL_ttf.h>
 #include <iostream>
-#include <thread>
 #include <chrono>
 #include <atomic>
 #include <mutex>
-#include <vector>
-#include <cstdlib>
-
-#define KEY_ESC   27        // Escape Key
-
-std::mutex mtx;
-std::vector<std::string> walkIntoWallMsg = {
-    "ARE YOU BLIND?? THAT'S A WALL!",
-    "We Reeeeeally walking into walls huh?",
-    "Ooft walked into a wall.",
-    "That's a wall! Should've gone to specsavers!"
-};
-
 // Cheat
-bool seeDeathTiles = true;
+bool seeDeathTiles = false;
 // Game State
+std::mutex mtx;
+std::atomic<bool> isRunning(true);
 bool endGame = false;
-char userInput;
+bool win = false;
 int playerPos[2] = { 6, 3 };
+const int row = 8;
+const int col = 8;
 
-char myArray[8][8] = {
+char myArray[row][col] = {
     {'#', '#', '#', '#', '#', '#', '#', '#'},
     {'#', '#', ' ', 'D', 'G', 'D', ' ', '#'},
-    {'#', ' ', ' ', ' ', ' ', ' ', ' ', '#'},
-    {'#', 'D', ' ', ' ', '#', 'D', ' ', '#'},
+    {'#', ' ', ' ', 'D', ' ', ' ', ' ', '#'},
+    {'#', 'D', ' ', ' ', ' ', 'D', ' ', '#'},
     {'#', ' ', ' ', ' ', '#', ' ', ' ', '#'},
     {'#', '#', ' ', '#', '#', '#', ' ', '#'},
     {'#', 'D', ' ', ' ', ' ', ' ', ' ', '#'},
@@ -48,70 +39,102 @@ enum DIRECTION {
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 SDL_Event event;
+// SDL2 Mixer
+Mix_Music* backgroundMusic = nullptr;
+Mix_Chunk* moveSound = nullptr;
+Mix_Chunk* wallSound = nullptr;
+// SDL2 TTF
+TTF_Font* textFont = nullptr;
+SDL_Texture* titleTexture = nullptr;
+SDL_Texture* textTexture = nullptr;
+SDL_Texture* textTexture2 = nullptr;
+SDL_Texture* textTexture3 = nullptr;
+SDL_Texture* optionsTexture = nullptr;
 
-bool init() {
+bool Init() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        std::cout << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
+        std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
         return false;
     }
-
-    window = SDL_CreateWindow("GridWorld", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 480, 470, SDL_WINDOW_SHOWN);
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        std::cerr << "SDL_mixer could not initialize! Mix_Error: " << Mix_GetError() << std::endl;
+        return 1;
+    }
+    window = SDL_CreateWindow("GridWorld", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 520, 520, SDL_WINDOW_SHOWN);
     if (window == nullptr) {
-        std::cout << "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
+        std::cerr << "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
         return false;
     }
-
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (renderer == nullptr) {
-        std::cout << "Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl;
+        std::cerr << "Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl;
+        return false;
+    }
+
+    if (TTF_Init() == -1) {
+        std::cerr << "TTF_Init Error: " << TTF_GetError() << std::endl;
         return false;
     }
 
     return true;
 }
 
-bool LoadAndPlayMusic(const char* filename) {
-    Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) == -1;
-    Mix_Music* music = Mix_LoadMUS(filename);
-    if (!music) {
+bool LoadAndPlayMusic(Mix_Music*& backgroundMusic) {
+    backgroundMusic = Mix_LoadMUS("background.mp3");
+
+    if (!backgroundMusic) {
         std::cerr << "Failed to load music: " << Mix_GetError() << std::endl;
         return false;
     }
-    
-    Mix_PlayMusic(music, -1); 
-    Mix_VolumeMusic(2);
+
+    Mix_PlayMusic(backgroundMusic, -1);
+    Mix_VolumeMusic(5);
     return true;
 }
 
-void close() {
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+void StopMusic(Mix_Music*& backgroundMusic) {
+    // Stop and free the music
+    Mix_HaltMusic();
+    Mix_FreeMusic(backgroundMusic);
+    Mix_CloseAudio();
 }
 
-void EndProgram() { // Sets EndGame to True to end the loop and exit the program
-    endGame = true;
+bool LoadSoundEffect(Mix_Chunk*& moveSound, Mix_Chunk*& wallSound) {
+    moveSound = Mix_LoadWAV("move.wav");
+    wallSound = Mix_LoadWAV("wall.wav");
+    if (!moveSound || !wallSound) {
+        std::cerr << "Failed to load sound effects! Mix_Error: " << Mix_GetError() << std::endl;
+        return false;
+    }
 }
 
-void Quit() { // Sends Quit Message and calls EndProgram()
-    std::cout << "Thanks For Playing.....fake gamer. ;O;" << std::endl;
-    EndProgram();
+void PlayMoveSoundEffect(Mix_Chunk*& move) {
+    Mix_PlayChannel(0, move, 0);
+    Mix_Volume(0, 40);
 }
 
-void Dies() { // Prints DeathMessage and calls EndProgram()
-    std::cout << "You've fallen down a pit. YOU HAVE DIED!\nIMAGINE DYING! XD LOL\nThanks for playing. Maybe next time BOZO!" << std::endl;
-    EndProgram();
+void PlayWallSoundEffect(Mix_Chunk*& wall) {
+    Mix_PlayChannel(0, wall, 0);
+    Mix_Volume(0, 70);
 }
 
-void FoundChest() { // Prints GoldChest Message and calls EndProgram()
-    std::cout << "WOW - you've discovered a large chest filled with GOLD coins!\nTOO BAD IT'S NOT REAL... BUT HEY! AT LEAST YOU WIN!\nThanks for playing. There probably won’t be a next time." << std::endl;
-    EndProgram();
+void StopSounds(Mix_Chunk*& moveSound, Mix_Chunk*& wallSound) {
+    Mix_HaltChannel(0);
+    Mix_FreeChunk(moveSound);
+    Mix_FreeChunk(wallSound);
 }
 
-void printWalkIntoWallMsg() {
-    int index = rand() % walkIntoWallMsg.size();
-    std::cout << walkIntoWallMsg[index] << std::endl;
-    std::cout << std::endl;
+void EndGame(bool& endgame) {
+    endgame = true;
+}
+
+void Dies() {
+    EndGame(endGame);
+}
+
+void FoundChest(bool& win) { 
+    win = true;
+    EndGame(endGame);
 }
 
 void Move(DIRECTION direction) { // Moves Player and Checks if player is standing on a D or a G
@@ -119,34 +142,38 @@ void Move(DIRECTION direction) { // Moves Player and Checks if player is standin
     int prevCol = playerPos[1];
     switch (direction) {
     case DIRECTION::NORTH:
-        if (myArray[prevRow - 1][prevCol] == '#') {
-            printWalkIntoWallMsg();
+        if (myArray[prevRow - 1][prevCol] == '#'){
+            PlayWallSoundEffect(wallSound);
         }
         else {
+            PlayMoveSoundEffect(moveSound);
             playerPos[0] = prevRow - 1;
         }
         break;
     case DIRECTION::SOUTH:
         if (myArray[prevRow + 1][prevCol] == '#') {
-            printWalkIntoWallMsg();
+            PlayWallSoundEffect(wallSound);
         }
         else {
+            PlayMoveSoundEffect(moveSound);
             playerPos[0] = prevRow + 1;
         }
         break;
     case DIRECTION::EAST:
         if (myArray[prevRow][prevCol + 1] == '#') {
-            printWalkIntoWallMsg();
+            PlayWallSoundEffect(wallSound);
         }
         else {
+            PlayMoveSoundEffect(moveSound);
             playerPos[1] = prevCol + 1;
         }
         break;
     case DIRECTION::WEST:
         if (myArray[prevRow][prevCol - 1] == '#') {
-            printWalkIntoWallMsg();
+            PlayWallSoundEffect(wallSound);
         }
         else {
+            PlayMoveSoundEffect(moveSound);
             playerPos[1] = prevCol - 1;
         }
         break;
@@ -155,11 +182,10 @@ void Move(DIRECTION direction) { // Moves Player and Checks if player is standin
     }
 
     char currentLocation = myArray[playerPos[0]][playerPos[1]];
-
     // Check if move kills player
     switch (currentLocation) {
     case 'G':
-        FoundChest();
+        FoundChest(win);
         break;
     case 'D':
         Dies();
@@ -169,127 +195,180 @@ void Move(DIRECTION direction) { // Moves Player and Checks if player is standin
     }
 }
 
-void UserCommand(SDL_Keycode key) {
-    userInput = tolower(key);
-
-    // WASD Command logic
-    if (userInput == 'q' || userInput == KEY_ESC) {
-        Quit();
-    }
-    else if (userInput == 'w') {
-        Move(DIRECTION::NORTH);
-    }
-    else if (userInput == 'd') {
-        Move(DIRECTION::EAST);
-    }
-    else if (userInput == 's') {
-        Move(DIRECTION::SOUTH);
-    }
-    else if (userInput == 'a') {
-        Move(DIRECTION::WEST);
-    }
-    else {
-        std::cout << "Not a valid input. Try Again.\n:> ";
-    }
-}
-
-void renderGrid() {
-    // Clear screen
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Black background
+void RenderGrid() {
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    // Render grid
-    int cellSize = 60;
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
+    int cellSize = 65;
+    for (int i = 0; i < row; i++) {
+        for (int j = 0; j < col; j++) {
             SDL_Rect cell = { j * cellSize, i * cellSize, cellSize, cellSize };
             if (myArray[i][j] == '#') {
-                SDL_SetRenderDrawColor(renderer, 240, 240, 240, 255); // White walls
+                SDL_SetRenderDrawColor(renderer, 163, 163, 163, 255); // grey walls
                 SDL_RenderFillRect(renderer, &cell);
             }
             if (seeDeathTiles) {
                 if (myArray[i][j] == 'D') {
-                    SDL_SetRenderDrawColor(renderer, 204, 0, 0, 255); // Dark red for deathTiles
+                    SDL_SetRenderDrawColor(renderer, 139, 0, 0, 255); // Dark red for deathTiles
                     SDL_RenderFillRect(renderer, &cell);
                 }
             }
             if (myArray[i][j] == 'G') {
-                SDL_SetRenderDrawColor(renderer, 20, 240, 0, 255); // Green Exit
+                SDL_SetRenderDrawColor(renderer, 234, 250, 5, 255); // Yellow Exit
                 SDL_RenderFillRect(renderer, &cell); 
             }
 
             // Draw player
             if (i == playerPos[0] && j == playerPos[1]) {
-                SDL_SetRenderDrawColor(renderer, 234, 250, 5, 255); // Yellow player
+                SDL_SetRenderDrawColor(renderer, 20, 240, 0, 255); // Green player
                 SDL_RenderFillRect(renderer, &cell);
             }
         }
     }
-
     SDL_RenderPresent(renderer);
 }
 
-void GameLoop(std::atomic<bool>& isRunning) {
-    SDL_Event e;
+SDL_Texture* RenderText(TTF_Font* font, SDL_Texture* texture, const int size, const char* text, int r, int g, int b, int yPos) {
+    font = TTF_OpenFont("font/MegamaxJonathanToo.ttf", size);
+    if (!font) {
+        std::cerr << "Failed to load '" << font << "' Text font!TTF_Error: " << TTF_GetError() << std::endl;
+    }
+    SDL_Color TextColor = { r, g, b, 255 };
+    SDL_Surface* Surface = TTF_RenderText_Solid(font, text, TextColor);
+    texture = SDL_CreateTextureFromSurface(renderer, Surface);
+    int Width = Surface->w;
+    int Height = Surface->h;
+    SDL_FreeSurface(Surface);
+    SDL_Rect Rect = { (520 - Width) / 2, yPos, Width, Height };
+    SDL_RenderCopy(renderer, texture, nullptr, &Rect);
+    TTF_CloseFont(font);
+    return texture;
+}
 
-    while (isRunning && !endGame) {
-        // Handle events
-        while (SDL_PollEvent(&e) != 0) {
-            if (e.type == SDL_QUIT) {
+void StopTTF() {
+    SDL_DestroyTexture(titleTexture);
+    SDL_DestroyTexture(textTexture);
+    SDL_DestroyTexture(textTexture2);
+    SDL_DestroyTexture(textTexture3);
+    SDL_DestroyTexture(optionsTexture);
+    TTF_CloseFont(textFont);
+}
+
+void RenderGameEnd(bool& win) {
+    SDL_SetRenderDrawColor(renderer, 180, 180, 180, 255);
+    SDL_RenderClear(renderer);
+    if (win)
+    {
+        titleTexture = RenderText(textFont, titleTexture, 60, "You Win!", 8, 138, 28, 50);
+        textTexture = RenderText(textFont, textTexture, 20, "WOW - a chest of GOLD coins!", 217, 255, 0, 200);
+        textTexture2 = RenderText(textFont, textTexture, 20, "Too bad it's fake... but you win!", 217, 255, 0, 230);
+        textTexture3 = RenderText(textFont, textTexture, 18, "Thanks for playing! Till next time.", 217, 255, 0, 260);
+    }
+    else {
+        titleTexture = RenderText(textFont, titleTexture, 70, "You Lose!", 209, 0, 0, 50);
+        textTexture = RenderText(textFont, textTexture, 18, "You've fallen down a pit. YOU DIED!", 209, 0, 0, 200);
+        textTexture2 = RenderText(textFont, textTexture, 24, "IMAGINE DYING! XD LOL", 209, 0, 0, 230);
+        textTexture3 = RenderText(textFont, textTexture, 24, "Maybe next time BOZO!", 209, 0, 0, 260);
+    }
+    optionsTexture = RenderText(textFont, optionsTexture, 24, "ESC to Quit     R to Retry", 8, 138, 28, 450);
+    SDL_RenderPresent(renderer);
+    StopTTF();
+}
+
+void InGameState(SDL_Event& e, bool& endGame) {
+    while (SDL_PollEvent(&e) != 0 && !endGame) {
+        if (e.type == SDL_QUIT) {
+            isRunning = false;
+        }
+        else if (e.type == SDL_KEYDOWN) {
+            switch (e.key.keysym.sym) {
+            case SDLK_w:
+                Move(DIRECTION::NORTH);
+                break;
+            case SDLK_a:
+                Move(DIRECTION::WEST);
+                break;
+            case SDLK_s:
+                Move(DIRECTION::SOUTH);
+                break;
+            case SDLK_d:
+                Move(DIRECTION::EAST);
+                break;
+            case SDLK_ESCAPE:
                 isRunning = false;
-            }
-            else if (e.type == SDL_KEYDOWN) {
-                switch (e.key.keysym.sym) {
-                case SDLK_w:
-                    Move(DIRECTION::NORTH);
-                    break;
-                case SDLK_a:
-                    Move(DIRECTION::WEST);
-                    break;
-                case SDLK_s:
-                    Move(DIRECTION::SOUTH);
-                    break;
-                case SDLK_d:
-                    Move(DIRECTION::EAST);
-                    break;
-                case SDLK_q:
-                    isRunning = false; // Quit game
-                    break;
-                }
+                break;
             }
         }
+    }
+    RenderGrid();
+    SDL_Delay(33);
+}
 
-        // Clear screen
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255); // Black background
-        SDL_RenderClear(renderer);
+void EndGameState(SDL_Event& e, bool& endGame, bool& win) {
+    Mix_PauseMusic();
+    RenderGameEnd(win);
 
-        // Draw the grid
-        renderGrid();
-
-        // Show what was drawn
-        SDL_RenderPresent(renderer);
-
-        SDL_Delay(16); // Cap frame rate at ~60 FPS
+    while (SDL_PollEvent(&e) != 0 && endGame) {
+        if (e.type == SDL_QUIT) {
+            isRunning = false;
+        }
+        else if (e.type == SDL_KEYDOWN) {
+            switch (e.key.keysym.sym) {
+            case SDLK_r:
+                playerPos[0] = 6;
+                playerPos[1] = 3;
+                win = false;
+                endGame = false;
+                Mix_ResumeMusic();
+                break;
+            case SDLK_ESCAPE:
+                isRunning = false;
+                break;
+            }
+        }
     }
 }
 
+void Close() {
+    StopMusic(backgroundMusic);
+    StopTTF();
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    TTF_Quit();
+    SDL_Quit();
+}
+
+void GameLoop(std::atomic<bool>& isRunning, bool& endgame, bool& win) {
+    SDL_Event e;
+    while (isRunning) {
+        if (!endGame) {
+            InGameState(e, endgame);
+        }
+        else {
+            EndGameState(e, endGame, win);
+        }
+    }
+}
 
 int main() {
-    std::atomic<bool> isRunning(true);
-
-    if (!init()) {
-        std::cout << "Failed to initialize SDL2!" << std::endl;
+    if (!Init()) {
+        std::cerr << "Failed to initialize SDL2!" << std::endl;
         return -1;
     }
 
-    if (!LoadAndPlayMusic("BGmusic.mp3")) {
-        std::cout << "Failed to initialize Music!" << std::endl;
+    if (!LoadAndPlayMusic(backgroundMusic)) {
+        std::cerr << "Failed to initialize Background Music!" << std::endl;
         return -1;
     }
 
-    GameLoop(isRunning); // Run the game loop on the main thread
+    if (!LoadSoundEffect(moveSound, wallSound)) {
+        std::cerr << "Failed to initialize Sound Effects!" << std::endl;
+        return -1;
+    }
 
-    close();
+    GameLoop(isRunning, endGame, win); // Run the game loop on the main thread
+
+    Close();
     return 0;
 }
 

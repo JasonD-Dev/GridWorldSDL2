@@ -1,3 +1,6 @@
 ﻿  main.cpp
-C:\Users\Jason\Documents\GitHub\GridWorldSDL2\GridworldSDL2\main.cpp(74,55): warning C4553: '==': result of expression not used; did you intend '='?
+C:\Users\Jason\Documents\GitHub\GridWorldSDL2\GridworldSDL2\main.cpp(236,29): warning C4838: conversion from 'int' to 'Uint8' requires a narrowing conversion
+C:\Users\Jason\Documents\GitHub\GridWorldSDL2\GridworldSDL2\main.cpp(236,32): warning C4838: conversion from 'int' to 'Uint8' requires a narrowing conversion
+C:\Users\Jason\Documents\GitHub\GridWorldSDL2\GridworldSDL2\main.cpp(236,35): warning C4838: conversion from 'int' to 'Uint8' requires a narrowing conversion
+C:\Users\Jason\Documents\GitHub\GridWorldSDL2\GridworldSDL2\main.cpp(109,1): warning C4715: 'LoadSoundEffect': not all control paths return a value
   GridworldSDL2.vcxproj -> C:\Users\Jason\Documents\GitHub\GridWorldSDL2\GridworldSDL2\x64\Debug\GridworldSDL2.exe

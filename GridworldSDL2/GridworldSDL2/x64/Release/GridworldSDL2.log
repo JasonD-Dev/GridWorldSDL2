@@ -1,0 +1,5 @@
+﻿  main.cpp
+C:\Users\Jason\Documents\GitHub\GridWorldSDL2\GridworldSDL2\main.cpp(38,6): error C2632: 'char' followed by 'int' is illegal
+C:\Users\Jason\Documents\GitHub\GridWorldSDL2\GridworldSDL2\main.cpp(38,10): error C2760: syntax error: 'constant' was unexpected here; expected 'id-expression'
+C:\Users\Jason\Documents\GitHub\GridWorldSDL2\GridworldSDL2\main.cpp(38,12): error C2059: syntax error: '['
+C:\Users\Jason\Documents\GitHub\GridWorldSDL2\GridworldSDL2\main.cpp(74,55): warning C4553: '==': result of expression not used; did you intend '='?
