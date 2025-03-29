@@ -26,3 +26,5 @@
 *~
 *.bak
 *.swp
+/GridworldSDL2/GridworldSDL2/x64/Debug
+/GridworldSDL2/GridworldSDL2/x64/Release

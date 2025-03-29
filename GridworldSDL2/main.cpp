@@ -15,6 +15,8 @@ int playerPos[2] = { 6, 3 };
 const int row = 8;
 const int col = 8;
 
+
+
 char myArray[row][col] = {
     {'#', '#', '#', '#', '#', '#', '#', '#'},
     {'#', '#', ' ', 'D', 'G', 'D', ' ', '#'},
@@ -48,8 +50,11 @@ SDL_Texture* textTexture = nullptr;
 SDL_Texture* textTexture2 = nullptr;
 SDL_Texture* textTexture3 = nullptr;
 SDL_Texture* optionsTexture = nullptr;
+// Icon
+SDL_Surface* icon = nullptr;
 
 bool Init() {
+
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
         return false;
@@ -63,6 +68,8 @@ bool Init() {
         std::cerr << "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
         return false;
     }
+
+
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (renderer == nullptr) {
         std::cerr << "Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl;
@@ -74,6 +81,17 @@ bool Init() {
         return false;
     }
 
+    icon = SDL_LoadBMP("icon.bmp");
+    if (icon == nullptr) {
+        std::cerr << "Icon Error: " << TTF_GetError() << std::endl;
+        return false;
+    }
+    else {
+        SDL_SetWindowIcon(window, icon);
+        SDL_FreeSurface(icon);
+    }
+    
+    SDL_SetWindowTitle(window, "SDL2 GridWorld by Jason D'Souza");
     return true;
 }
 
@@ -316,7 +334,7 @@ void EndGameState(SDL_Event& e, bool& endGame, bool& win) {
             case SDLK_r:
                 playerPos[0] = 6;
                 playerPos[1] = 3;
-                win = false;
+                win = false; 
                 endGame = false;
                 Mix_ResumeMusic();
                 break;
@@ -350,6 +368,7 @@ void GameLoop(std::atomic<bool>& isRunning, bool& endgame, bool& win) {
 }
 
 int SDL_main(int argc, char* argv[]) {
+
     if (!Init()) {
         std::cerr << "Failed to initialize SDL2!" << std::endl;
         return -1;
